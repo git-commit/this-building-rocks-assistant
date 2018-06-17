@@ -55,13 +55,15 @@ def say_ip():
     ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True)
     aiy.audio.say('My IP address is %s' % ip_address.decode('utf-8'))
 
-def humidity_request():
+def humidity_info():
     aiy.audio.say('The humidity percentage is over 9000! Can I open up the window for you?')
 
 def window_request():
+    time.sleep(.5)
+    responder = aiy.assistant.grpc.get_assistant()
     with aiy.audio.get_recorder():
         while True:
-            text = responder.recognize()
+            text, _ = responder.recognize()
             if text:
                 if "yes" in text:
                         open = 1
@@ -82,14 +84,6 @@ def process_event(assistant, event):
 
     elif event.type == EventType.ON_CONVERSATION_TURN_STARTED:
         status_ui.status('listening')
-
-    elif 'with_follow_on_turn' in event.args.keys() and event.args['with_follow_on_turn']:
-        text = event.args['text'].lower()
-        if 'yes' in text:
-            aiy.audio.say('Ok, I am opening the window!')
-        elif 'no' in text:
-            aiy.audio.say('Sure thing.')
-            assistant.stop_conversation()
         
     elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
         print('You said:', event.args['text'])
@@ -105,10 +99,8 @@ def process_event(assistant, event):
             say_ip()
         elif 's the humidity inside' in text:
             assistant.stop_conversation()
-            humidity_request()
-            assistant.start_conversation()
-            #process_event(assistant, Event(EventType.ON_CONVERSATION_TURN_STARTED, {'with_follow_on_turn': True}))
-
+            humidity_info()
+            window_request()
         
     elif event.type == EventType.ON_END_OF_UTTERANCE:
         status_ui.status('thinking')
