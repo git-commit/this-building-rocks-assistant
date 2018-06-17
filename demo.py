@@ -21,12 +21,15 @@ code doesn't need to record audio. Hot word detection "OK, Google" is supported.
 It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
 
+import requests
+import json
+import time
+
 import logging
 import platform
 import subprocess
 import sys
 
-import time
 import aiy.assistant.auth_helpers
 from aiy.assistant.library import Assistant
 import aiy.audio
@@ -55,8 +58,8 @@ def say_ip():
     ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True)
     aiy.audio.say('My IP address is %s' % ip_address.decode('utf-8'))
 
-def humidity_info():
-    aiy.audio.say('The humidity percentage is over 9000! Can I open up the window for you?')
+def humidity_info(humidity):
+    aiy.audio.say('The humidity is at ' + str(humidity) + ' percent! Can I open up the window for you?')
 
 def window_request():
     time.sleep(.5)
@@ -75,7 +78,7 @@ def window_request():
     else: 
         aiy.audio.say("Sure thing.")
 
-def process_event(assistant, event):
+def process_event(assistant, event, humidity):
     status_ui = aiy.voicehat.get_status_ui()
     if event.type == EventType.ON_START_FINISHED:
         status_ui.status('ready')
@@ -99,7 +102,7 @@ def process_event(assistant, event):
             say_ip()
         elif 's the humidity inside' in text:
             assistant.stop_conversation()
-            humidity_info()
+            humidity_info(humidity)
             window_request()
         
     elif event.type == EventType.ON_END_OF_UTTERANCE:
@@ -115,13 +118,24 @@ def process_event(assistant, event):
 
 
 def main():
+    indoor_id = 'cffbf07c-4789-4762-9895-c23f0298a495'
+    url1 = 'https://api.preview.oltd.de/v1/devices/'
+    url2 = '/state'
+    endpoint_indoor = url1 + indoor_id + url2
+    headers = {"Authorization":"Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJNRWo4QkVEaWZnSnBfTzB3OEJCbEYxU05TNElmdlMyLWhERFBWTDRaTDYwIn0.eyJqdGkiOiIwMWUyMjgzMy1mZTdkLTQ0YjUtYTkzNS03YjE5YjE5ZjgwMzIiLCJleHAiOjE1MzAwMjMxMDEsIm5iZiI6MCwiaWF0IjoxNTI5MTU5MTAxLCJpc3MiOiJodHRwczovL2FwaS5wcmV2aWV3Lm9sdGQuZGUvYXV0aC9yZWFsbXMvb2x0IiwiYXVkIjoib2x0X3BvcnRhbCIsInN1YiI6ImMzZThhYjZmLTA3MDYtNDVhNC05Y2U1LWMyY2IwMDYyMmMzNyIsInR5cCI6IkJlYXJlciIsImF6cCI6Im9sdF9wb3J0YWwiLCJub25jZSI6IkUxWHFta0N4ZGd5ZGs3UGhFcmNZQ2VVQmd4ZmFGYXg4NVVwb3ZZT0giLCJhdXRoX3RpbWUiOjE1MjkxNTkxMDEsInNlc3Npb25fc3RhdGUiOiI2NDQ1MDVmMS04NTg2LTQyNjYtOWFmYy0yMDc4NDVlMGQ0OWUiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbXSwicmVzb3VyY2VfYWNjZXNzIjp7fSwiZW1haWxfdmVyaWZpZWQiOnRydWUsInByZWZlcnJlZF91c2VybmFtZSI6Im9zci1vbHQtZ2F0ZXdheS1lazkxNjBAbWFpbGluYXRvci5jb20iLCJnaXZlbl9uYW1lIjoiT0xUIEdhdGV3YXkgIiwiZmFtaWx5X25hbWUiOiJFSzkxNjAiLCJlbWFpbCI6Im9zci1vbHQtZ2F0ZXdheS1lazkxNjBAbWFpbGluYXRvci5jb20iLCJ0ZW5hbnQiOiI5YzRkMDhjMS1hNmRmLTQyZmQtYWQ0MS1mNzZjYjRhY2Y5M2UifQ.lqzYoQzzRNavIbDvdYVWF-0DhsxMfxTwlDlEh6icuA5YrhFk83-ntT6jgEuu2n-1EKvptihgafrIUxfCTCMFkXsbHNMoPmd9tG0REyLLVMqY5uwzCrIQYL7jNyKlpsttV-sBU2ZLbRtu_DV0Iu550gZuYBuTGpoXvEiZ1ArdlDuHkDykrRHPAixZXe_9yeXspJ2OBp8F3URt83vYc1e8HCWOaNT_9iEnZSWVmlADjt85BAhBpjBG81IO6V4FVXwQbjo8I3acLldqG82O9LDlzgLdjLNMyFGJ2Gm1Ooxa3yRPNvI1z9xgoOUdOvDvKdEEwG1kywsvECmoCvp6U9QL1A"}
+
+
     if platform.machine() == 'armv6l':
         print('Cannot run hotword demo on Pi Zero!')
         exit(-1)
+    
     credentials = aiy.assistant.auth_helpers.get_assistant_credentials()
     with Assistant(credentials) as assistant:
+        r = requests.get(endpoint_indoor, headers=headers)
+        humidity = round(r.json()['data']['attributes']['FTKPlus']['properties']['Humidity'], 1)
+
         for event in assistant.start():
-            process_event(assistant, event)
+            process_event(assistant, event, humidity)
 
 
 if __name__ == '__main__':
